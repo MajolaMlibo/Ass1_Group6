@@ -18,25 +18,26 @@ set.seed(2026)
 # Number of observations
 n <- 1000
 
-# 1. X2: Living Arrangement (Categorical: 1=Res, 2=Off-campus, 3=Private)
+# MODIFICATION: Moved living_arrangement BEFORE funding_source to fix 'object not found' logical error.
+# X2: Living Arrangement (Categorical: 1=On campus, 2=Off campus(Res/Apartment), 3=Private)
 living_arrangement <- sample(c(1, 2, 3), n, replace = TRUE, prob = c(0.3, 0.4, 0.3))
 
-# 2. X3: Distance from Campus (Continuous - Correlated with Living Arrangement)
-distance_km <- ifelse(living_arrangement == 1, abs(rnorm(n, 0.1, 0.05)),
-                ifelse(living_arrangement == 2, abs(rnorm(n, 5, 2)),
-                       abs(rnorm(n, 12, 4))))
-
-# 3. X1: Funding Source (Binary: 1=NSFAS/Bursary, 0=Private)
+# X1: Funding Source (Binary: 1=NSFAS/Bursary, 0=Private; Treatment)
 # Replaced rbinom with a conditional sample() function
 funding_source <- ifelse(living_arrangement == 3, 
                          sample(c(1, 0), n, replace = TRUE, prob = c(0.2, 0.8)), 
                          sample(c(1, 0), n, replace = TRUE, prob = c(0.7, 0.3)))
 
-# 4. X4: Social Outings (Count variable)
+# X3: Distance from Campus (Continuous - Correlated with Living Arrangement)
+distance_km <- ifelse(living_arrangement == 1, abs(rnorm(n, 0.1, 0.05)),
+                ifelse(living_arrangement == 2, abs(rnorm(n, 5, 2)),
+                       abs(rnorm(n, 12, 4))))
+
+# X4: Social Outings (Count variable)
 # Replaced rpois with a simple rounded rnorm() calculation, using abs() to prevent negatives
 social_outings <- round(abs(rnorm(n, mean = 4, sd = 2)))
 
-# 5. X5: Library Visits (Nuisance Variable)
+# X5: Library Visits (Nuisance Variable)
 # Replaced rpois with a rounded rnorm calculation
 base_library_visits <- round(abs(rnorm(n, mean = 15, sd = 4)))
 library_visits <- round(pmax(base_library_visits - (0.20 * social_outings), 0))
@@ -64,31 +65,47 @@ student_data <- data.frame(
   monthly_expenditure_Y = round(monthly_expenditure_Y, 2)
 )
 
-# MODIFICATION: Changed the lm() formula to include the interaction term (funding_source * social_outings) 
-# instead of just main effects. Added 'data = student_data' to fix the logical scoping error. 
-# This improves the model to accurately capture the true generation parameters.
-mdel <- lm(monthly_expenditure_Y ~ funding_source * social_outings+living_arrangement , data = student_data)
-summary(mdel)
-# MODIFICATION: Ensure output directory exists to avoid file writing errors
-dir.create("output", showWarnings = FALSE)
+mdel <- lm(monthly_expenditure_Y ~ funding_source * social_outings + living_arrangement, data = student_data)
 
-# MODIFICATION: Updated path to save to the output folder
-write.csv(student_data, "output/UFS_Student_Expenditure_Data.csv", row.names = FALSE)
+dir.create("outputs", showWarnings = FALSE)
 
-# ==========================================
+# Save to CSV
+write.csv(student_data, "outputs/UFS_Student_Expenditure_Data.csv", row.names = FALSE)
+
 # Generate Scatterplot Matrix
-# ==========================================
-
-# MODIFICATION: Recreated the scatter plot without color coding by living arrangement.
-# Added the png() and dev.off() wrappers to save the graphic directly to the output folder.
-png("output/Scatterplot_Matrix.png", width = 800, height = 800)
+# MODIFICATION: Corrected directory typo from "output" to "outputs"
+png("outputs/Scatterplot_Matrix.png", width = 800, height = 800)
 pairs(student_data[, c("distance_km", "social_outings", "library_visits", "monthly_expenditure_Y")], 
-      pch = 16,            # Uses solid circles instead of hollow ones
-      col = "black",       # Uniform color, not color-coded by living arrangement
-      cex = 0.8,           # Makes the dots slightly smaller to reduce clutter
+      pch = 16,            
+      col = "black",      
+      cex = 0.8,           
       labels = c("Distance (km)", "Social Outings", "Library Visits", "Expenditure (ZAR)"),
       main = "Student Expenditure Correlations")
 dev.off()
 
 summary(mdel)
-```
+
+# X1: Funding Source Graph
+png("outputs/X1_Funding_Source.png")
+barplot(table(student_data$funding_source), main = "Distribution of Funding Source", xlab = "0 = Private, 1 = NSFAS/Bursary", ylab = "Frequency", col = "lightblue")
+dev.off()
+
+# X2: Living Arrangement Graph
+png("outputs/X2_Living_Arrangement.png")
+barplot(table(student_data$living_arrangement), main = "Distribution of Living Arrangement", xlab = "1 = Res, 2 = Off-campus, 3 = Private", ylab = "Frequency", col = "lightgreen")
+dev.off()
+
+# X3: Distance Graph
+png("outputs/X3_Distance.png")
+hist(student_data$distance_km, main = "Distribution of Distance from Campus", xlab = "Distance (km)", col = "lightcoral", breaks = 20)
+dev.off()
+
+# X4: Social Outings Graph
+png("outputs/X4_Social_Outings.png")
+hist(student_data$social_outings, main = "Distribution of Social Outings", xlab = "Outings per Month", col = "plum", breaks = 15)
+dev.off()
+
+# X5: Library Visits Graph
+png("outputs/X5_Library_Visits.png")
+hist(student_data$library_visits, main = "Distribution of Library Visits", xlab = "Visits per Month", col = "wheat", breaks = 15)
+dev.off()
