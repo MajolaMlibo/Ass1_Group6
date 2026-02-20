@@ -3,7 +3,8 @@ title: 'STSM3734 Assignment 1: Group 8 Simulation'
 author: "Mlibo Majola"
 date: "`r Sys.Date()`"
 output:
-  word_document: default
+  word_document:
+    reference_docx: "Assignment 1 - Group 8.docx"
   html_document: default
 ---
 
