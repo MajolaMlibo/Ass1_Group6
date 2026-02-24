@@ -110,3 +110,4 @@ dev.off()
 png("outputs/X5_Library_Visits.png")
 hist(student_data$library_visits, main = "Distribution of Library Visits", xlab = "Visits per Month", col = "wheat", breaks = 15)
 dev.off()
+```
