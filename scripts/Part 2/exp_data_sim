@@ -1,0 +1,52 @@
+# Part II: Experimental Design
+n_per_cell <- 40
+study_cat <- c("Low study", "Mid study", "High study")
+lit_cat   <- c("Low Lit", "Mid Lit", "High Lit")
+living_cat <- c("On-campus", "Off-campus", "Apartment")
+funding_cat <- c(0, 1)
+
+# Create a balanced grid
+exp_design <- expand.grid(
+  Study = study_cat,
+  Literacy = lit_cat,
+  Living = living_cat,
+  Funding = funding_cat
+)
+
+# Replicate for sample size
+exp_data <- exp_design[rep(1:nrow(exp_design), each = n_per_cell), ]
+
+# Assign "Experimental" Spending based on the categories
+# Using mean values for the categories to maintain the "true model" logic
+exp_epsilon <- rnorm(nrow(exp_data), 0, 400)
+exp_data$spending <- 2500 + 
+  (ifelse(exp_data$Study == "High study", -200, 0)) +
+  (ifelse(exp_data$Literacy == "High Lit", -600, 0)) +
+  (ifelse(exp_data$Living == "Apartment", 1000, 0)) +
+  (400 * as.numeric(as.character(exp_data$Funding))) +
+  exp_epsilon
+
+# Verify balance
+table(exp_data$Study, exp_data$Literacy)
+
+# ==========================================
+# MODIFICATIONS: Output Generation
+# ==========================================
+
+# MODIFICATION: Ensure outputs directory exists to avoid file writing errors
+dir.create("outputs", showWarnings = FALSE)
+
+# MODIFICATION: Save the experimental dataframe to CSV in the correct folder
+write.csv(exp_data, "outputs/Experimental_Data.csv", row.names = FALSE)
+
+# MODIFICATION: Generate and save a barplot to visually prove the orthogonal balance of the experimental design
+png("outputs/Experimental_Balance_Plot.png", width = 800, height = 600)
+balance_counts <- table(exp_data$Study, exp_data$Literacy)
+barplot(balance_counts, beside = TRUE, 
+        col = c("lightblue", "lightgreen", "lightcoral"),
+        main = "Experimental Design Balance (Study vs Literacy)",
+        xlab = "Literacy Level", 
+        ylab = "Number of Observations",
+        legend = rownames(balance_counts), 
+        args.legend = list(title = "Study Level", x = "topright"))
+dev.off()
