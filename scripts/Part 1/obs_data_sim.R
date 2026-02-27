@@ -81,3 +81,7 @@ dev.off()
 png("outputs/X6_Distance.png")
 hist(obs_data$distance, main = "Distance from Campus", xlab = "km", col = "darkgray")
 dev.off()
+
+mdel <- lm( student_spending ~ living_arr + fin_lit + social_outings + distance + funding, data = obs_data )
+
+summary(mdel)
