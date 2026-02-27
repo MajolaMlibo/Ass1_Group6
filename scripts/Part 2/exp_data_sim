@@ -35,7 +35,7 @@ table(exp_data$Study, exp_data$Literacy)
 dir.create("outputs", showWarnings = FALSE)
 
 # Save the experimental dataframe to CSV in the correct folder
-write.csv(exp_data, "outputs/Experimental_Data.csv", row.names = FALSE)
+write.csv(exp_data, "outputs/data/Experimental_Data.csv", row.names = FALSE)
 
 # Generate and save a barplot to visually prove the orthogonal balance of the experimental design
 png("outputs/Experimental_Balance_Plot.png", width = 800, height = 600)

@@ -37,12 +37,12 @@ distance <- ifelse(living_arr == "On-campus",
 # Combine and create "True Model" for Student Spending (Y)
 # Effects: High Literacy reduces spending, Apartments increase it
 epsilon <- rnorm(n, 0, 400) # Noise
-student_spending <- 2000 + 
+student_spending <- 2000 +         # True linear regression model
   (500 * as.numeric(living_arr)) - # Apartment > Off-campus > On-campus
-  (15 * fin_lit) +                # Literacy reduces spending
-  (100 * social_outings) +        # Outings increase spending
-  (50 * distance) +               # Distance/Transport costs 
-  (300 * funding) +               # Extra disposable income
+  (15 * fin_lit) +                 # Literacy reduces spending
+  (100 * social_outings) +         # Outings increase spending
+  (50 * distance) +                # Distance/Transport costs
+  (300 * funding) +                # Extra disposable income
   epsilon
 
 obs_data <- data.frame(student_spending, hours_study, social_outings, 
@@ -50,35 +50,35 @@ obs_data <- data.frame(student_spending, hours_study, social_outings,
 
 # Added output directory creation and CSV writing.
 dir.create("outputs", showWarnings = FALSE)
-write.csv(obs_data, "outputs/Observational_Data.csv", row.names = FALSE)
+write.csv(obs_data, "outputs/data/Observational_Data.csv", row.names = FALSE)
 
 # Added png() and dev.off() to save the scatterplot matrix.
-png("outputs/Scatterplot_Matrix.png", width = 800, height = 800)
+png("outputs/plots/Scatterplot_Matrix.png", width = 800, height = 800)
 pairs(obs_data[,2:7], main = "Bivariate Scatterplot Matrix", pch = 16, col = "black")
 dev.off()
 
 # Added code to generate and save individual distribution graphs for all predictors.
-png("outputs/X1_Hours_Study.png")
+png("outputs/distributions/X1_Hours_Study.png")
 hist(obs_data$hours_study, main = "Distribution of Study Hours", xlab = "Hours/Week", col = "lightblue")
 dev.off()
 
-png("outputs/X2_Social_Outings.png")
+png("outputs/distributions/X2_Social_Outings.png")
 hist(obs_data$social_outings, main = "Distribution of Social Outings", xlab = "Outings", col = "plum")
 dev.off()
 
-png("outputs/X3_Fin_Lit.png")
+png("outputs/distributions/X3_Fin_Lit.png")
 hist(obs_data$fin_lit, main = "Distribution of Financial Literacy", xlab = "Score (0-100)", col = "lightgreen")
 dev.off()
 
-png("outputs/X4_Living_Arrangement.png")
+png("outputs/distributions/X4_Living_Arrangement.png")
 barplot(table(obs_data$living_arr), main = "Living Arrangement", col = "lightcoral", ylab = "Frequency")
 dev.off()
 
-png("outputs/X5_Funding.png")
+png("outputs/distributions/X5_Funding.png")
 barplot(table(obs_data$funding), main = "Funding Source (0=Self, 1=NSFAS)", col = "wheat", ylab = "Frequency")
 dev.off()
 
-png("outputs/X6_Distance.png")
+png("outputs/distributions/X6_Distance.png")
 hist(obs_data$distance, main = "Distance from Campus", xlab = "km", col = "darkgray")
 dev.off()
 
