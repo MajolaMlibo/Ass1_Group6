@@ -43,6 +43,7 @@ student_spending <- 2000 +         # True linear regression model
   (100 * social_outings) +         # Outings increase spending
   (50 * distance) +                # Distance/Transport costs
   (300 * funding) +                # Extra disposable income
+  (hours_study ) +                 # Nuisance variable
   epsilon
 
 obs_data <- data.frame(student_spending, hours_study, social_outings, 
@@ -82,7 +83,7 @@ png("outputs/distributions/X6_Distance.png")
 hist(obs_data$distance, main = "Distance from Campus", xlab = "km", col = "darkgray")
 dev.off()
 
- naive_model <- lm(student_spending ~ living_arr + fin_lit + social_outings + distance + funding, data = obs_data)
+ naive_model <- lm(student_spending ~ living_arr + fin_lit + social_outings + distance + funding + hours_study, data = obs_data)
 summary(naive_model)
 
 # Diagnostic Plots Generation
