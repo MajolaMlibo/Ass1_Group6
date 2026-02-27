@@ -31,7 +31,7 @@ exp_design <- expand.grid(
 )
 
 # Replicating to increase sample size (324 cells * 10 = 3240 observations)
-exp_data <- exp_design[rep(1:nrow(exp_design), each = n_per_cell), ]
+exp_data <- exp_design[rep(seq_len(nrow(exp_design)), each = n_per_cell), ]
 
 # Mapping Strings to Numeric Values for the "True Model" Calculation
 num_fin_lit <- ifelse(exp_data$fin_lit == "Low", 30, 
