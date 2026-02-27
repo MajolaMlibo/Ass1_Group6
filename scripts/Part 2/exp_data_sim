@@ -1,79 +1,75 @@
-# Part II: Experimental Design
-# MODIFICATION: Re-seeded for reproducibility
+# ==========================================
+# Part II: Experimental Data Simulation
+# ==========================================
+
+# 1. Setup and Reproducibility
 set.seed(123)
+n_per_cell <- 10
 
-n_per_cell <- 20 
+# 2. Define String Categories for Orthogonal Design
+# These strings will be automatically treated as factors/dummy variables by lm()
+study_cat   <- c("Low", "Mid", "High")
+lit_cat     <- c("Low", "Mid", "High")
+living_cat  <- c("On-campus", "Off-campus", "Apartment")
+funding_cat <- c("Self", "NSFAS")
+outings_cat <- c("Low", "Mid", "High")
+dist_cat    <- c("Near", "Far")
 
-# 1. Discretize variables into specific numeric levels to represent categories
-# We keep these numeric temporarily ONLY to calculate the exact "True Model" spending.
-study_levels    <- c(15, 35)              # Low vs High study hours
-lit_levels      <- c(40, 60, 80)          # Low, Mid, High financial literacy
-living_levels   <- c(1, 2, 3)             # 1=On-campus, 2=Off-campus, 3=Apartment
-funding_levels  <- c(0, 1)                # 0=Self, 1=NSFAS
-outings_levels  <- c(2, 6)                # Low vs High social outings
-distance_levels <- c(1, 10)               # Near vs Far distance
-
-# 2. Create a balanced orthogonal grid
-# Grid size: 2 * 3 * 3 * 2 * 2 * 2 = 144 unique combinations
+# 3. Create the Balanced Orthogonal Grid
+# Grid size: 3 * 3 * 3 * 2 * 3 * 2 = 324 unique combinations
 exp_design <- expand.grid(
-  hours_study = study_levels,
-  fin_lit = lit_levels,
-  living_arr_num = living_levels,
-  funding = funding_levels,
-  social_outings = outings_levels,
-  distance = distance_levels
+  hours_study = study_cat,
+  fin_lit = lit_cat,
+  living_arr = living_cat,
+  funding = funding_cat,
+  social_outings = outings_cat,
+  distance = dist_cat
 )
 
-# 3. Replicate for sample size (144 cells * 20 = 2880 total observations)
+# 4. Replicate to increase sample size (324 cells * 10 = 3240 observations)
 exp_data <- exp_design[rep(1:nrow(exp_design), each = n_per_cell), ]
 
-# 4. Convert 'living_arr_num' back to categorical factor
-exp_data$living_arr <- factor(exp_data$living_arr_num, 
-                              levels = c(1, 2, 3), 
-                              labels = c("On-campus", "Off-campus", "Apartment"))
+# 5. Map Strings to Numeric Values for the "True Model" Calculation
+# We need numbers to calculate the spending, even though the analysis uses strings.
+num_fin_lit <- ifelse(exp_data$fin_lit == "Low", 30, 
+               ifelse(exp_data$fin_lit == "Mid", 60, 90))
 
-# 5. Assign "Experimental" Spending using the EXACT True Model from Part I
-# [MODIFIED] Reduced the standard deviation from 400 to 250 to restore the R-squared value.
-exp_epsilon <- rnorm(nrow(exp_data), 0, 250)
+num_outings <- ifelse(exp_data$social_outings == "Low", 1, 
+               ifelse(exp_data$social_outings == "Mid", 5, 9))
+
+num_distance <- ifelse(exp_data$distance == "Near", 1, 12)
+
+num_living <- ifelse(exp_data$living_arr == "On-campus", 1, 
+              ifelse(exp_data$living_arr == "Off-campus", 2, 3))
+
+num_funding <- ifelse(exp_data$funding == "NSFAS", 1, 0)
+
+# 6. Generate "Experimental" Spending (Y) using the True Model Formula
+exp_epsilon <- rnorm(nrow(exp_data), 0, 400)
 
 exp_data$student_spending <- 2000 + 
-  (500 * exp_data$living_arr_num) -       # Apartment > Off-campus > On-campus
-  (15 * exp_data$fin_lit) +               # Literacy reduces spending
-  (100 * exp_data$social_outings) +       # Outings increase spending
-  (50 * exp_data$distance) +              # Distance/Transport costs 
-  (300 * exp_data$funding) +              # Extra disposable income
+  (500 * num_living) -         # Apartment costs more than On-campus
+  (15 * num_fin_lit) +         # Literacy reduces spending
+  (100 * num_outings) +        # Outings increase spending
+  (50 * num_distance) +        # Distance adds transport costs
+  (300 * num_funding) +        # Funding increases disposable income
   exp_epsilon
-
-# [MODIFIED] Convert all continuous numeric variables into factors (binary/categorical indicators)
-# This fulfills the lecturer's strict requirement for the variables to be indicators in the model and CSV.
-exp_data$hours_study_cat <- factor(exp_data$hours_study, levels = c(15, 35), labels = c("Low", "High"))
-exp_data$fin_lit_cat <- factor(exp_data$fin_lit, levels = c(40, 60, 80), labels = c("Low", "Medium", "High"))
-exp_data$funding_cat <- factor(exp_data$funding, levels = c(0, 1), labels = c("Self", "NSFAS"))
-exp_data$social_outings_cat <- factor(exp_data$social_outings, levels = c(2, 6), labels = c("Low", "High"))
-exp_data$distance_cat <- factor(exp_data$distance, levels = c(1, 10), labels = c("Near", "Far"))
-
-# [MODIFIED] Isolate only the factor variables and the dependent variable for a clean output
-exp_data_csv <- exp_data[, c("student_spending", "hours_study_cat", "fin_lit_cat", 
-                             "living_arr", "funding_cat", "social_outings_cat", "distance_cat")]
-
-# Verify balance using the new categorical factors
-table(exp_data_csv$social_outings_cat, exp_data_csv$fin_lit_cat)
 
 # ==========================================
 # Output Generation
 # ==========================================
 
-# Ensure outputs directory exists to avoid file writing errors
-dir.create("outputs", showWarnings = FALSE)
+# Ensure output directory exists
+dir.create("outputs/data", showWarnings = FALSE, recursive = TRUE)
 
-# [MODIFIED] Save the clean, categorized dataframe to CSV
-write.csv(exp_data_csv, "outputs/Experimental_Data.csv", row.names = FALSE)
+# Save the experimental data to CSV
+write.csv(exp_data, "outputs/data/Experimental_Data.csv", row.names = FALSE)
 
-# [MODIFIED] Generate and save a barplot using the categorical columns
+# Generate and save the Balance Plot
 png("outputs/Experimental_Balance_Plot.png", width = 800, height = 600)
-balance_counts <- table(exp_data_csv$social_outings_cat, exp_data_csv$fin_lit_cat)
+balance_counts <- table(exp_data$social_outings, exp_data$fin_lit)
 barplot(balance_counts, beside = TRUE, 
-        col = c("lightblue", "lightcoral"),
+        col = c("lightblue", "lightgreen", "lightcoral"),
         main = "Experimental Design Balance (Outings vs Literacy)",
         xlab = "Financial Literacy Level", 
         ylab = "Number of Observations",
@@ -81,7 +77,8 @@ barplot(balance_counts, beside = TRUE,
         args.legend = list(title = "Social Outings", x = "topright"))
 dev.off()
 
-# 6. Analyze the Experimental Data
-# [MODIFIED] The model now correctly utilizes the binary/categorical indicators to evaluate the orthogonal matrix.
-nested_model <- lm(student_spending ~ living_arr + fin_lit_cat + social_outings_cat + funding_cat + distance_cat, data = exp_data_csv)
+# ==========================================
+# Analysis: Nested Model
+# ==========================================
+nested_model <- lm(student_spending ~ living_arr + fin_lit + social_outings + funding + distance, data = exp_data)
 summary(nested_model)

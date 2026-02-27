@@ -83,7 +83,7 @@ png("outputs/distributions/X6_Distance.png")
 hist(obs_data$distance, main = "Distance from Campus", xlab = "km", col = "darkgray")
 dev.off()
 
- naive_model <- lm(student_spending ~ living_arr + fin_lit + social_outings + distance + funding + hours_study, data = obs_data)
+naive_model <- lm(student_spending ~ living_arr + fin_lit + social_outings + distance + funding + hours_study, data = obs_data)
 summary(naive_model)
 
 # Diagnostic Plots Generation
