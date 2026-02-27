@@ -29,17 +29,15 @@ exp_data$spending <- 2500 +
 # Verify balance
 table(exp_data$Study, exp_data$Literacy)
 
-# ==========================================
-# MODIFICATIONS: Output Generation
-# ==========================================
+# Output Generation
 
-# MODIFICATION: Ensure outputs directory exists to avoid file writing errors
+# Ensure outputs directory exists to avoid file writing errors
 dir.create("outputs", showWarnings = FALSE)
 
-# MODIFICATION: Save the experimental dataframe to CSV in the correct folder
+# Save the experimental dataframe to CSV in the correct folder
 write.csv(exp_data, "outputs/Experimental_Data.csv", row.names = FALSE)
 
-# MODIFICATION: Generate and save a barplot to visually prove the orthogonal balance of the experimental design
+# Generate and save a barplot to visually prove the orthogonal balance of the experimental design
 png("outputs/Experimental_Balance_Plot.png", width = 800, height = 600)
 balance_counts <- table(exp_data$Study, exp_data$Literacy)
 barplot(balance_counts, beside = TRUE, 
@@ -50,3 +48,6 @@ barplot(balance_counts, beside = TRUE,
         legend = rownames(balance_counts), 
         args.legend = list(title = "Study Level", x = "topright"))
 dev.off()
+
+nested_model <- lm(student_spending ~ living_arr + fin_lit + social_outings + funding, data = obs_data)
+summary(nested_model)
