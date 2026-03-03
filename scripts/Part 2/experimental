@@ -2,64 +2,59 @@
 # Part II: Experimental Data Simulation
 # ==========================================
 
-set.seed(123)
-n_per_cell <- 10
-
-# ==========================================
-# String Categories for Orthogonal Design
-# ==========================================
-
-study_cat   <- c("Low", "Mid", "High")
-lit_cat     <- c("Low", "Mid", "High")
-living_cat  <- c("On-campus", "Off-campus", "Apartment")
-funding_cat <- c("Self", "NSFAS")
-outings_cat <- c("Low", "Mid", "High")
-dist_cat    <- c("Near", "Far")
+set.seed(2026) # Matching the markdown seed
 
 # ==========================================
 # Balanced Orthogonal Grid
 # ==========================================
 
-# Grid size: 3 * 3 * 3 * 2 * 3 * 2 = 324 unique combinations
-exp_design <- expand.grid(
-  hours_study = study_cat,
-  fin_lit = lit_cat,
-  living_arr = living_cat,
-  funding = funding_cat,
-  social_outings = outings_cat,
-  travel_distance = dist_cat
+# Create Grid based on new categories
+exp_grid <- expand.grid(
+  Funding = c(0, 1), 
+  Accommodation = c(1, 2, 3), 
+  Distance = c("Close", "Far"), 
+  FinLit = c("Low", "Moderate", "High"), 
+  StudyHrs = c("Low", "Moderate", "High"), 
+  Outings = c("Low", "Moderate", "High")
 )
 
-# Replicating to increase sample size (324 cells * 10 = 3240 observations)
-exp_data <- exp_design[rep(seq_len(nrow(exp_design)), each = n_per_cell), ]
+# Replicate to reach N=4860
+# (Grid rows * 15 = Total N)
+exp_data <- exp_grid[rep(seq_len(nrow(exp_grid)), each = 15), ]
 
-# Mapping Strings to Numeric Values for the "True Model" Calculation
-num_fin_lit <- ifelse(exp_data$fin_lit == "Low", 30, 
-               ifelse(exp_data$fin_lit == "Mid", 60, 90))
+# ==========================================
+# True Model (Re-simulation)
+# ==========================================
 
-num_outings <- ifelse(exp_data$social_outings == "Low", 1, 
-               ifelse(exp_data$social_outings == "Mid", 5, 9))
+# Base Intercept
+beta_0 <- 2200
 
-num_travel_distance <- ifelse(exp_data$travel_distance == "Near", 1, 12)
+# define Categorical Effects (True Betas)
+dist_eff <- ifelse(exp_data$Distance == "Far", 700, 0)
 
-num_living <- ifelse(exp_data$living_arr == "On-campus", 1, 
-              ifelse(exp_data$living_arr == "Off-campus", 2, 3))
+lit_eff  <- ifelse(exp_data$FinLit == "Moderate", -300, 
+                   ifelse(exp_data$FinLit == "High", -800, 0))
 
-num_funding <- ifelse(exp_data$funding == "NSFAS", 1, 0)
+out_eff  <- ifelse(exp_data$Outings == "Moderate", 1000, 
+                   ifelse(exp_data$Outings == "High", 2400, 0))
 
-# =========================================================
-# Experimental: Spending (Y) using the True Model Formula
-# =========================================================
+acc_eff  <- ifelse(exp_data$Accommodation == 2, 850, 
+                   ifelse(exp_data$Accommodation == 3, 3200, 0))
 
-exp_epsilon <- rnorm(nrow(exp_data), 0, 400)
+# Apply noise (Same sigma as observational: 1650)
+noise <- rnorm(nrow(exp_data), 0, 1650)
 
-exp_data$student_spending <- 2000 + 
-  (500 * num_living) -         # Apartment costs more than On-campus
-  (15 * num_fin_lit) +         # Literacy reduces spending
-  (100 * num_outings) +        # Outings increase spending
-  (50 * num_travel_distance) + # Distance adds transport costs
-  (300 * num_funding) +        # Funding increases disposable income
-  exp_epsilon
+# Calculate Spending
+exp_data$Spending <- round(beta_0 + 
+                           (500 * exp_data$Funding) + 
+                           acc_eff + 
+                           dist_eff + 
+                           lit_eff + 
+                           out_eff + 
+                           noise, 2)
+
+# Apply realistic constraints
+exp_data$Spending <- pmax(pmin(exp_data$Spending, 13000), 1200)
 
 # ==========================================
 # Output Generation
@@ -68,20 +63,177 @@ exp_data$student_spending <- 2000 +
 dir.create("outputs/data", showWarnings = FALSE, recursive = TRUE)
 write.csv(exp_data, "outputs/data/Experimental_Data.csv", row.names = FALSE)
 
+# Balance Plot (Optional visual check)
+dir.create("outputs/plots", showWarnings = FALSE, recursive = TRUE)
 png("outputs/plots/Experimental_Balance_Plot.png", width = 800, height = 600)
-balance_counts <- table(exp_data$social_outings, exp_data$fin_lit)
+balance_counts <- table(exp_data$Outings, exp_data$FinLit)
 barplot(balance_counts, beside = TRUE, 
         col = c("lightblue", "lightgreen", "lightcoral"),
-        main = "Experimental Design Balance (Outings vs Literacy)",
+        main = "Experimental Design Balance (Outings vs FinLit)",
         xlab = "Financial Literacy Level", 
         ylab = "Number of Observations",
         legend = rownames(balance_counts), 
-        args.legend = list(title = "Social Outings", x = "topright"))
+        args.legend = list(title = "Outings", x = "topright"))
 dev.off()
 
 # ==========================================
-# Analysis: Nested Model
+# Analysis: Experimental Model
 # ==========================================
 
-nested_model <- lm(student_spending ~ living_arr + fin_lit + social_outings + funding + travel_distance, data = exp_data)
-summary(nested_model)
+model_exp <- lm(Spending ~ Funding + factor(Accommodation) + Distance + 
+                FinLit + StudyHrs + Outings, data = exp_data)
+
+# Print Summary
+summary(model_exp)
+cat("Experimental R-Squared:", round(summary(model_exp)$r.squared, 2))
+
+# ==========================================
+# Comparison of True vs Estimated (Slide 7 Table)
+# ==========================================
+
+# Extract Estimated Coefficients
+exp_estimates <- round(coef(model_exp), 2)
+
+# Define True Betas (Must match the effects programmed above)
+exp_true_values <- c(
+  "(Intercept)"             = 2200,
+  "Funding"                 = 500,
+  "factor(Accommodation)2"  = 850,
+  "factor(Accommodation)3"  = 3200,
+  "DistanceFar"             = 700,
+  "FinLitModerate"          = -300,
+  "FinLitHigh"              = -800,
+  "StudyHrsModerate"        = 0,     # Zero because it's indirect
+  "StudyHrsHigh"            = 0,
+  "OutingsModerate"         = 1000,
+  "OutingsHigh"             = 2400
+)
+
+# Comparison Data Frame
+exp_comparison <- data.frame(
+  Variable = names(exp_estimates),
+  True_Beta = exp_true_values[names(exp_estimates)],
+  Estimated_Beta = exp_estimates,
+  Bias = round(exp_estimates - exp_true_values[names(exp_estimates)], 2)
+)
+
+print(exp_comparison)# ==========================================
+# Part II: Experimental Data Simulation
+# ==========================================
+
+set.seed(2026) # Matching the markdown seed
+
+# ==========================================
+# Balanced Orthogonal Grid
+# ==========================================
+
+# Create Grid based on new categories
+exp_grid <- expand.grid(
+  Funding = c(0, 1), 
+  Accommodation = c(1, 2, 3), 
+  Distance = c("Close", "Far"), 
+  FinLit = c("Low", "Moderate", "High"), 
+  StudyHrs = c("Low", "Moderate", "High"), 
+  Outings = c("Low", "Moderate", "High")
+)
+
+# Replicate to reach N=4860
+# (Grid rows * 15 = Total N)
+exp_data <- exp_grid[rep(seq_len(nrow(exp_grid)), each = 15), ]
+
+# ==========================================
+# True Model (Re-simulation)
+# ==========================================
+
+# Base Intercept
+beta_0 <- 2200
+
+# define Categorical Effects (True Betas)
+dist_eff <- ifelse(exp_data$Distance == "Far", 700, 0)
+
+lit_eff  <- ifelse(exp_data$FinLit == "Moderate", -300, 
+                   ifelse(exp_data$FinLit == "High", -800, 0))
+
+out_eff  <- ifelse(exp_data$Outings == "Moderate", 1000, 
+                   ifelse(exp_data$Outings == "High", 2400, 0))
+
+acc_eff  <- ifelse(exp_data$Accommodation == 2, 850, 
+                   ifelse(exp_data$Accommodation == 3, 3200, 0))
+
+# Apply noise (Same sigma as observational: 1650)
+noise <- rnorm(nrow(exp_data), 0, 1650)
+
+# Calculate Spending
+exp_data$Spending <- round(beta_0 + 
+                           (500 * exp_data$Funding) + 
+                           acc_eff + 
+                           dist_eff + 
+                           lit_eff + 
+                           out_eff + 
+                           noise, 2)
+
+# Apply realistic constraints
+exp_data$Spending <- pmax(pmin(exp_data$Spending, 13000), 1200)
+
+# ==========================================
+# Output Generation
+# ==========================================
+
+dir.create("outputs/data", showWarnings = FALSE, recursive = TRUE)
+write.csv(exp_data, "outputs/data/Experimental_Data.csv", row.names = FALSE)
+
+# Balance Plot (Optional visual check)
+dir.create("outputs/plots", showWarnings = FALSE, recursive = TRUE)
+png("outputs/plots/Experimental_Balance_Plot.png", width = 800, height = 600)
+balance_counts <- table(exp_data$Outings, exp_data$FinLit)
+barplot(balance_counts, beside = TRUE, 
+        col = c("lightblue", "lightgreen", "lightcoral"),
+        main = "Experimental Design Balance (Outings vs FinLit)",
+        xlab = "Financial Literacy Level", 
+        ylab = "Number of Observations",
+        legend = rownames(balance_counts), 
+        args.legend = list(title = "Outings", x = "topright"))
+dev.off()
+
+# ==========================================
+# Analysis: Experimental Model
+# ==========================================
+
+model_exp <- lm(Spending ~ Funding + factor(Accommodation) + Distance + 
+                FinLit + StudyHrs + Outings, data = exp_data)
+
+# Print Summary
+summary(model_exp)
+cat("Experimental R-Squared:", round(summary(model_exp)$r.squared, 2))
+
+# ==========================================
+# Comparison of True vs Estimated (Slide 7 Table)
+# ==========================================
+
+# Extract Estimated Coefficients
+exp_estimates <- round(coef(model_exp), 2)
+
+# Define True Betas (Must match the effects programmed above)
+exp_true_values <- c(
+  "(Intercept)"             = 2200,
+  "Funding"                 = 500,
+  "factor(Accommodation)2"  = 850,
+  "factor(Accommodation)3"  = 3200,
+  "DistanceFar"             = 700,
+  "FinLitModerate"          = -300,
+  "FinLitHigh"              = -800,
+  "StudyHrsModerate"        = 0,     
+  "StudyHrsHigh"            = 0,
+  "OutingsModerate"         = 1000,
+  "OutingsHigh"             = 2400
+)
+
+# Comparison Data Frame
+exp_comparison <- data.frame(
+  Variable = names(exp_estimates),
+  True_Beta = exp_true_values[names(exp_estimates)],
+  Estimated_Beta = exp_estimates,
+  Bias = round(exp_estimates - exp_true_values[names(exp_estimates)], 2)
+)
+
+print(exp_comparison)

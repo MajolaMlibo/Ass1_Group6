@@ -1,0 +1,370 @@
+---
+title: "Assignment 1: Student Spending Simulation and Analysis"
+author: "Group Analysis"
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r variables}
+# This hidden chunk sets global options to ensure code and output are both visible
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+set.seed(2026)
+n <- 4860
+
+# 1. Independent Variables
+x_gender <- sample(c(0, 1), n, replace = TRUE) 
+x_funding <- sample(c(0, 1), n, replace = TRUE, prob = c(0.4, 0.6))
+x_accommodation <- sample(c(1, 2, 3), n, replace = TRUE, prob = c(0.3, 0.5, 0.2))
+
+# Distance: Continuous KM
+x_distance <- ifelse(x_accommodation == 1, runif(n, 0.01, 0.49), runif(n, 1.5, 15))
+x_distance <- round(x_distance, 2)
+
+# Financial Literacy & Study Hours
+x_fin_lit <- round(pmax(pmin(rnorm(n, 55, 12), 100), 0), 2)
+x_study_hrs <- round(runif(n, 9, 42) * 4, 2)
+
+# Social Outings (Correlation: Literacy and Study Hours reduce outings)
+lambda_outings <- pmax(1, 14 - (0.05 * x_study_hrs) - (0.06 * x_fin_lit))
+x_outings <- rpois(n, lambda = lambda_outings)
+```
+
+
+ghhj
+ 
+```{r model}
+# 2. Generating Spending (Y) with high noise for 35-50% R-squared
+beta_0 <- 2200 
+acc_adj <- ifelse(x_accommodation == 2, 850, ifelse(x_accommodation == 3, 3200, 0))
+# Large SD (1650) ensures the model doesn't explain too much of the variance
+epsilon <- rnorm(n, mean = 0, sd = 1650) 
+# Base spending (Intercept)
+beta_0 <- 2200 
+
+# Individual effects
+ # Baseline spending
+beta_funding  <- 500   # NSFAS increase
+beta_dist     <- 25    # Cost per KM
+beta_lit      <- -12   # Savings per literacy point
+beta_outings  <- 180   # Cost per social outing
+beta_off_campus <- 850
+beta_apartment  <- 3200
+
+# High noise to ensure R-squared is 35-50%
+sigma_noise   <- 1650
+
+y_spending <- beta_0 + (beta_funding * x_funding) + acc_adj + (beta_dist * x_distance) + 
+              (beta_outings * x_outings) + (beta_lit * x_fin_lit) + epsilon
+
+# Rounding and realistic constraints (R1200 - R13000)
+y_spending <- round(pmax(pmin(y_spending, 13000), 1200), 2)
+
+obs_data <- data.frame(Spending = y_spending, Funding = x_funding, 
+                       Accommodation = x_accommodation, Distance = x_distance, 
+                       FinLit = x_fin_lit, StudyHrs = x_study_hrs, 
+                       Outings = x_outings, Gender = x_gender)
+
+```
+ggggggggggg  
+```{r histograms}
+# --- HISTOGRAMS FOR OBSERVATIONAL DATA ---
+
+# Set up a grid of 3 rows and 3 columns
+par(mfrow = c(3, 3), mar = c(4, 4, 2, 1)) 
+
+# 1. Spending (The Outcome)
+hist(obs_data$Spending, col = "skyblue", main = "Spending (Y)", xlab = "Rands")
+
+# 2. Funding
+hist(obs_data$Funding, col = "lightgreen", main = "Funding Status", xlab = "0 = No, 1 = Yes")
+
+# 3. Accommodation
+hist(obs_data$Accommodation, col = "salmon", main = "Accommodation Type", xlab = "1=Res, 2=Off, 3=Apt")
+
+# 4. Distance
+hist(obs_data$Distance, col = "gold", main = "Distance to Campus", xlab = "Kilometers")
+
+# 5. Financial Literacy
+hist(obs_data$FinLit, col = "plum", main = "Fin. Literacy Score", xlab = "Score (0-100)")
+
+# 6. Study Hours
+hist(obs_data$StudyHrs, col = "lightblue", main = "Study Hours", xlab = "Weekly Hours")
+
+# 7. Social Outings
+hist(obs_data$Outings, col = "orange", main = "Social Outings", xlab = "Number of Outings")
+
+# 8. Gender (Nuisance)
+hist(obs_data$Gender, col = "grey", main = "Gender", xlab = "0 = Male, 1 = Female")
+
+# Reset plotting parameters to default (1x1)
+par(mfrow = c(1, 1))
+```
+gggg
+```{r scatter plot mstrix}
+
+# --- SCATTER PLOT MATRIX (OBSERVATIONAL DATA) ---
+
+# Select the key variables for the matrix
+# Spending, Distance, FinLit, StudyHrs, and Outings
+plot_data <- obs_data[, c("Spending", "Distance", "FinLit", "StudyHrs", "Outings")]
+
+# Generate the matrix
+# pch=16 and col=rgb(...) makes the points small and transparent to handle 4860 rows
+pairs(plot_data, 
+      main = "Scatter Plot Matrix: Student Spending Drivers",
+      pch = 16, 
+      cex = 0.5, 
+      col = rgb(0.2, 0.4, 0.6, 0.1),
+      lower.panel = panel.smooth) # Adds a trend line to the bottom half
+```
+tttt
+
+```{r plot}
+hist(obs_data$Spending, main="Observational: Monthly Student Spending", 
+     xlab="ZAR", col="skyblue", border="white", breaks=40)
+abline(v = c(2500, 5000), col = "red", lwd = 2, lty = 2)
+
+# Relationship between Outings and Spending
+plot(obs_data$Outings, obs_data$Spending, main="Outings vs Spending",
+     xlab="Number of Outings", ylab="Spending (ZAR)", pch=16, col=rgb(0,0,1,0.2))
+
+
+```
+tttt
+
+```{r textiles}
+# Create Balanced Grid
+exp_grid <- expand.grid(Funding = c(0, 1), 
+                        Accommodation = c(1, 2, 3), 
+                        Distance = c("Close", "Far"), 
+                        FinLit = c("Low", "Moderate", "High"), 
+                        StudyHrs = c("Low", "Moderate", "High"), 
+                        Outings = c("Low", "Moderate", "High"))
+
+# Replicate to reach N=4860
+exp_data <- exp_grid[rep(seq_len(nrow(exp_grid)), each = 15), ]
+
+# Re-simulate Response using categorical effects
+dist_eff <- ifelse(exp_data$Distance == "Far", 700, 0)
+lit_eff  <- ifelse(exp_data$FinLit == "Moderate", -300, 
+                   ifelse(exp_data$FinLit == "High", -800, 0))
+out_eff  <- ifelse(exp_data$Outings == "Moderate", 1000, 
+                   ifelse(exp_data$Outings == "High", 2400, 0))
+acc_eff  <- ifelse(exp_data$Accommodation == 2, 850, 
+                   ifelse(exp_data$Accommodation == 3, 3200, 0))
+
+# Apply the same noise level to keep R-squared around 35-50%
+exp_data$Spending <- round(beta_0 + (500 * exp_data$Funding) + acc_eff + 
+                           dist_eff + lit_eff + out_eff + 
+                           rnorm(nrow(exp_data), 0, 1650), 2)
+
+exp_data$Spending <- pmax(pmin(exp_data$Spending, 13000), 1200)
+
+model_obs <- lm(Spending ~ Funding + factor(Accommodation) + Distance + 
+                FinLit + StudyHrs + Outings + Gender, data = obs_data)
+
+```
+jjjjjj
+
+```{r R-squared}
+# Show coefficients and R-squared
+round(summary(model_obs)$coefficients, 2)
+cat("Observational R-Squared:", round(summary(model_obs)$r.squared, 2))
+
+model_exp <- lm(Spending ~ Funding + factor(Accommodation) + Distance + 
+                FinLit + StudyHrs + Outings, data = exp_data)
+
+# Show coefficients and R-squared
+round(summary(model_exp)$coefficients, 2)
+cat("Experimental R-Squared:", round(summary(model_exp)$r.squared, 2))
+par(mfrow = c(2, 2))
+plot(model_exp)
+
+```
+
+## Comparison of True vs. Estimated Parameters (Experimental Data)
+
+This section evaluates the accuracy of the Experimental Model. We compare the coefficients estimated by the model against the discrete categorical effects we programmed into the simulation.
+
+```{r exp_comparison_table_expda}
+# 1. Extract Estimated Coefficients from the Experimental Model
+exp_estimates <- round(coef(model_exp), 2)
+
+# 2. Define the True Betas for the Experimental Categories
+# These match the 'dist_eff', 'lit_eff', and 'out_eff' values from Part III
+exp_true_values <- c(
+  "(Intercept)"             = beta_0,
+  "Funding"                 = beta_funding,
+  "factor(Accommodation)2"  = beta_off_campus,
+  "factor(Accommodation)3"  = beta_apartment,
+  "DistanceFar"             = 700,   # Programmed effect for Far vs Close
+  "FinLitModerate"          = -300,  # Programmed effect for Moderate vs Low
+  "FinLitHigh"              = -800,  # Programmed effect for High vs Low
+  "StudyHrsModerate"        = 0,     # Programmed as 0 (indirect effect only)
+  "StudyHrsHigh"            = 0,     # Programmed as 0 (indirect effect only)
+  "OutingsModerate"         = 1000,  # Programmed effect for Moderate vs Low
+  "OutingsHigh"             = 2400   # Programmed effect for High vs Low
+)
+
+# 3. Align and combine into a comparison data frame
+# This ensures we only compare variables that exist in the model output
+exp_comparison <- data.frame(
+  Variable = names(exp_estimates),
+  True_Beta = exp_true_values[names(exp_estimates)],
+  Estimated_Beta = exp_estimates,
+  Bias = round(exp_estimates - exp_true_values[names(exp_estimates)], 2)
+)
+
+# 4. Display the table in the Word Document
+knitr::kable(exp_comparison, 
+             caption = "Experimental Model: Programmed Effects vs. Model Estimates",
+             row.names = FALSE)
+```
+hhhh  
+j
+```{r Comparision_y}
+# --- COMPARATIVE EXPENDITURE HISTOGRAMS ---
+
+# Set layout for 2 plots side-by-side
+par(mfrow = c(1, 2), mar = c(5, 4, 4, 2))
+
+# 1. Observational Spending Distribution
+hist(obs_data$Spending, 
+     main = "Observed Spending", 
+     xlab = "Monthly Expenditure (ZAR)", 
+     col = "#5DADE2", # Soft Blue
+     border = "white",
+     breaks = 40,
+     xlim = c(1200, 13000))
+# Add reference lines for the R2.5k - R5k target range
+abline(v = c(2500, 5000), col = "darkred", lwd = 2, lty = 2)
+
+# 2. Experimental Spending Distribution
+hist(exp_data$Spending, 
+     main = "Experimental Spending", 
+     xlab = "Monthly Expenditure (ZAR)", 
+     col = "#58D68D", # Soft Green
+     border = "white",
+     breaks = 40,
+     xlim = c(1200, 13000))
+# Add same reference lines
+abline(v = c(2500, 5000), col = "darkred", lwd = 2, lty = 2)
+
+# Reset layout
+par(mfrow = c(1, 1))
+```
+Feature,Observational Plot,Experimental Plot
+Shape,"Likely more ""Bell-Shaped"" (Normal) because continuous variables average out.","Often looks more ""Blocky"" or Uniform because we have equal numbers of students in every category."
+Range,"Both should strictly stay between R1,200 and R13,000.","Both should strictly stay between R1,200 and R13,000."
+Peak (Mode),"Should center around the R2,500 – R5,000 mark (indicated by red lines).","Should also center around the same mark, verifying the simulation logic is identical."
+
+
+
+
+
+## Distributional Comparison: Superimposed Histogram and Q-Q Plots
+
+This section visually compares the "Expenditure" (Spending) between the Observational and Experimental groups to verify that both simulations reflect the same South African student financial context.
+
+```{r distribution_plots}
+# 1. SETUP: Superimposed Histogram
+# Calculate common range for the x-axis
+xlim_range <- range(c(obs_data$Spending, exp_data$Spending))
+
+# Create the first histogram (Observational)
+hist(obs_data$Spending, 
+     breaks = 40, 
+     col = rgb(0.2, 0.5, 0.8, 0.5), # Transparent Blue
+     xlab = "Monthly Expenditure (ZAR)", 
+     main = "Superimposed Expenditure Distribution",
+     xlim = xlim_range,
+     border = "white")
+
+# Superimpose the second histogram (Experimental)
+hist(exp_data$Spending, 
+     breaks = 40, 
+     col = rgb(0.8, 0.2, 0.2, 0.5), # Transparent Red
+     add = TRUE, 
+     border = "white")
+
+# Add a legend to distinguish the two
+legend("topright", 
+       legend = c("Observational", "Experimental"), 
+       fill = c(rgb(0.2, 0.5, 0.8, 0.5), rgb(0.8, 0.2, 0.2, 0.5)),
+       border = "black")
+
+# 2. SETUP: Side-by-Side Q-Q Plots
+# These check if the spending follows a normal distribution
+par(mfrow = c(1, 2)) # 1 row, 2 columns
+
+# Q-Q Plot for Observational
+qqnorm(obs_data$Spending, 
+       main = "Q-Q Plot: Observational", 
+       col = rgb(0.2, 0.5, 0.8, 0.4), 
+       pch = 16)
+qqline(obs_data$Spending, col = "darkblue", lwd = 2)
+
+# Q-Q Plot for Experimental
+qqnorm(exp_data$Spending, 
+       main = "Q-Q Plot: Experimental", 
+       col = rgb(0.8, 0.2, 0.2, 0.4), 
+       pch = 16)
+qqline(exp_data$Spending, col = "darkred", lwd = 2)
+
+# Reset layout
+par(mfrow = c(1, 1))
+```
+## Model Performance Comparison: R-Squared and Residuals
+
+This table evaluates the overall "Success" of our two models. While we targeted an R-squared of 35-50%, the residuals provide a deeper look into the prediction error of each design.
+
+```{r model_fit_comparison}
+# 1. Extract R-Squared and Adjusted R-Squared
+r2_obs <- summary(model_obs)$r.squared
+adj_r2_obs <- summary(model_obs)$adj.r.squared
+
+r2_exp <- summary(model_exp)$r.squared
+adj_r2_exp <- summary(model_exp)$adj.r.squared
+
+# 2. Extract Residual Statistics (RSE and Range)
+# Residual Standard Error (RSE) represents the "Average Error" in Rands
+rse_obs <- summary(model_obs)$sigma
+rse_exp <- summary(model_exp)$sigma
+
+# Range of Residuals (Min to Max)
+res_range_obs <- range(residuals(model_obs))
+res_range_exp <- range(residuals(model_exp))
+
+# 3. Construct the Comparison Table
+model_perf_table <- data.frame(
+  Metric = c("R-Squared (Raw)", "Adjusted R-Squared", "Residual Std. Error (RSE)", "Min Residual", "Max Residual"),
+  Observational_Model = c(round(r2_obs, 4), round(adj_r2_obs, 4), round(rse_obs, 2), 
+                          round(res_range_obs[1], 2), round(res_range_obs[2], 2)),
+  Experimental_Model = c(round(r2_exp, 4), round(adj_r2_exp, 4), round(rse_exp, 2), 
+                         round(res_range_exp[1], 2), round(res_range_exp[2], 2))
+)
+
+# 4. Display the table
+knitr::kable(model_perf_table, 
+             caption = "Performance Summary: Observational vs. Experimental Models",
+             col.names = c("Performance Metric", "Observational Data", "Experimental Data"))
+```
+```{r savinh}
+# =========================================================
+# PART VII: SAVING THE SIMULATED DATASETS
+# =========================================================
+
+# 1. Save the Observational Data
+# This file contains the continuous variables and the nuisance variable (Gender)
+write.csv(obs_data, "Student_Spending_Observational.csv", row.names = FALSE)
+
+# 2. Save the Experimental Data
+# This file contains the categorized/balanced variables used for the True Model check
+write.csv(exp_data, "Student_Spending_Experimental.csv", row.names = FALSE)
+
+# Confirmation message to be printed in the document
+cat("Success! The following files have been saved to your working directory:\n",
+    "- Student_Spending_Observational.csv\n",
+    "- Student_Spending_Experimental.csv")
+```
