@@ -29,9 +29,6 @@ x_study_hrs <- round(runif(n, 9, 42) * 4, 2)
 lambda_outings <- pmax(1, 14 - (0.05 * x_study_hrs) - (0.06 * x_fin_lit))
 x_outings <- rpois(n, lambda = lambda_outings)
 ```
-
-
-ghhj
  
 ```{r model}
 # 2. Generating Spending (Y) with high noise for 35-50% R-squared
